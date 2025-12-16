@@ -677,9 +677,13 @@ function generar($aForm = '')
 
                 if ($detallado == 'S') {
 
-                        $anio_reporte = $anio;
+                        $fecha_inicio_reporte = new DateTime(sprintf('%04d-%02d-01', $anio, $mes));
+                        $fecha_fin_reporte    = new DateTime(sprintf('%04d-%02d-01', $anio_fin, $mes_fin));
 
-                        for ($m = $mes; $m <= $mes_fin; $m++) {
+                        while ($fecha_inicio_reporte <= $fecha_fin_reporte) {
+
+                                $anio_reporte = (int)$fecha_inicio_reporte->format('Y');
+                                $m             = (int)$fecha_inicio_reporte->format('m');
 
 
 				// ULTIMA FILA TOTALES	
@@ -716,12 +720,13 @@ function generar($aForm = '')
                                                                 ( saegact.gact_cod_empr = saesgac.sgac_cod_empr )
                                         INNER JOIN saeact ON ( saesgac.sgac_cod_sgac = saeact.sgac_cod_sgac ) and
                                                               ( saesgac.sgac_cod_empr = saeact.act_cod_empr )
-                                        INNER JOIN saecdep actual ON ( saeact.act_cod_act = actual.cdep_cod_acti ) and
+                                        LEFT JOIN saecdep actual ON ( saeact.act_cod_act = actual.cdep_cod_acti ) and
                                                                      ( saeact.act_cod_empr = actual.act_cod_empr ) and
                                                                      ( saeact.act_cod_sucu = actual.act_cod_sucu ) and
                                                                      ( actual.act_cod_empr = $empresa ) and
                                                                      ( actual.cdep_ani_depr = $anio_reporte ) and
-                                                                     ( actual.cdep_mes_depr = $m )
+                                                                     ( actual.cdep_mes_depr = $m ) and
+                                                                     ( actual.act_cod_sucu = $sucursal )
                                         LEFT JOIN (
                                                 SELECT cdep_cod_acti,
                                                        act_cod_empr,
@@ -729,13 +734,15 @@ function generar($aForm = '')
                                                        SUM(cdep_gas_depn) AS dep_anterior
                                                 FROM saecdep
                                                 WHERE act_cod_empr = $empresa
+                                                AND act_cod_sucu = $sucursal
                                                 AND (cdep_ani_depr < $anio_reporte OR (cdep_ani_depr = $anio_reporte AND cdep_mes_depr < $m))
                                                 GROUP BY 1,2,3
                                         ) historico ON historico.cdep_cod_acti = saeact.act_cod_act
                                                   AND historico.act_cod_empr = saeact.act_cod_empr
                                                   AND historico.act_cod_sucu = saeact.act_cod_sucu
                                         WHERE ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($anio_reporte *100 + $m)  )  and
-                                              ( DATE_PART('year', act_fcmp_act) < $anio_reporte or ( DATE_PART('year', act_fcmp_act) = $anio_reporte and DATE_PART('month',act_fcmp_act)<= $m))
+                                              ( DATE_PART('year', act_fcmp_act) < $anio_reporte or ( DATE_PART('year', act_fcmp_act) = $anio_reporte and DATE_PART('month',act_fcmp_act)<= $m)) and
+                                              ( DATE_PART('year', COALESCE(act_fdep_act, act_fcmp_act)) < $anio_reporte or ( DATE_PART('year', COALESCE(act_fdep_act, act_fcmp_act)) = $anio_reporte and DATE_PART('month',COALESCE(act_fdep_act, act_fcmp_act))<= $m))
                                                 $filtro
                                         ORDER BY saegact.gact_des_gact, saesgac.sgac_des_sgac, saeact.act_nom_act, cdep_ani_depr, cdep_mes_depr ";
 				//echo $sql; exit;
@@ -923,8 +930,9 @@ function generar($aForm = '')
 							</tr>';
 					}
 				}
-				$oIfx->Free();
-			} //CIERRE FOR MES
+                                $oIfx->Free();
+                                $fecha_inicio_reporte->modify('+1 month');
+                        } //CIERRE WHILE MES
 
 		} //CIERRE IF DETALLADO
 
@@ -955,12 +963,13 @@ function generar($aForm = '')
                                                         ( saegact.gact_cod_empr = saesgac.sgac_cod_empr )
                                 INNER JOIN saeact ON ( saesgac.sgac_cod_sgac = saeact.sgac_cod_sgac ) and
                                                       ( saesgac.sgac_cod_empr = saeact.act_cod_empr )
-                                INNER JOIN saecdep actual ON ( saeact.act_cod_act = actual.cdep_cod_acti ) and
+                                LEFT JOIN saecdep actual ON ( saeact.act_cod_act = actual.cdep_cod_acti ) and
                                                              ( saeact.act_cod_empr = actual.act_cod_empr ) and
                                                              ( saeact.act_cod_sucu = actual.act_cod_sucu ) and
                                                              ( actual.act_cod_empr = $empresa ) and
                                                              ( actual.cdep_ani_depr = $anio_fin ) and
-                                                             ( actual.cdep_mes_depr = $mes_fin )
+                                                             ( actual.cdep_mes_depr = $mes_fin ) and
+                                                             ( actual.act_cod_sucu = $sucursal )
                                 LEFT JOIN (
                                         SELECT cdep_cod_acti,
                                                act_cod_empr,
@@ -968,13 +977,15 @@ function generar($aForm = '')
                                                SUM(cdep_gas_depn) AS dep_anterior
                                         FROM saecdep
                                         WHERE act_cod_empr = $empresa
+                                        AND act_cod_sucu = $sucursal
                                         AND (cdep_ani_depr < $anio_fin OR (cdep_ani_depr = $anio_fin AND cdep_mes_depr < $mes_fin))
                                         GROUP BY 1,2,3
                                 ) historico ON historico.cdep_cod_acti = saeact.act_cod_act
                                           AND historico.act_cod_empr = saeact.act_cod_empr
                                           AND historico.act_cod_sucu = saeact.act_cod_sucu
                                 WHERE ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($anio_fin *100 + $mes_fin)  )  and
-                                      ( DATE_PART('year', act_fcmp_act) < $anio_fin or ( DATE_PART('year', act_fcmp_act) = $anio_fin and DATE_PART('month',act_fcmp_act)<= $mes_fin))
+                                      ( DATE_PART('year', act_fcmp_act) < $anio_fin or ( DATE_PART('year', act_fcmp_act) = $anio_fin and DATE_PART('month',act_fcmp_act)<= $mes_fin)) and
+                                      ( DATE_PART('year', COALESCE(act_fdep_act, act_fcmp_act)) < $anio_fin or ( DATE_PART('year', COALESCE(act_fdep_act, act_fcmp_act)) = $anio_fin and DATE_PART('month',COALESCE(act_fdep_act, act_fcmp_act))<= $mes_fin))
                                         $filtro
                                 ORDER BY saegact.gact_des_gact, saesgac.sgac_des_sgac, saeact.act_nom_act, cdep_ani_depr, cdep_mes_depr ";
 			//echo $sql; exit;
