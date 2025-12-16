@@ -702,13 +702,17 @@ function generar($aForm = '')
 					 saegact.gact_des_gact,   
 					 saesgac.sgac_cod_sgac,   
 					 saesgac.sgac_des_sgac,   					 
-					(select c.cdep_dep_acum 
-					 from saecdep c 
-					 where c.cdep_cod_acti = saecdep.cdep_cod_acti
-					 and c.act_cod_empr = saecdep.act_cod_empr
-					 and c.act_cod_sucu = saecdep.act_cod_sucu
-					 and c.cdep_ani_depr = $anio
-					 and c.cdep_mes_depr = $m) as cdep_dep_acum,
+                                        (
+                                                select COALESCE(sum(c.cdep_gas_depn), 0)
+                                                from saecdep c
+                                                where c.cdep_cod_acti = saecdep.cdep_cod_acti
+                                                and c.act_cod_empr = saecdep.act_cod_empr
+                                                and c.act_cod_sucu = saecdep.act_cod_sucu
+                                                and (
+                                                        c.cdep_ani_depr < $anio
+                                                        or (c.cdep_ani_depr = $anio and c.cdep_mes_depr < $m)
+                                                )
+                                        ) as cdep_dep_acum,
 					 sum(saecdep.cdep_gas_depn) as cdep_gas_depn, 					 
 					 max(saecdep.cdep_mes_depr) as cdep_mes_depr,
 					 DATE_PART('year', act_fiman_act ) anio,
