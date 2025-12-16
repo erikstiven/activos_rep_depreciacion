@@ -679,6 +679,8 @@ function generar($aForm = '')
 
                         $anioReporte = (int) $anio_fin;
                         $mesReporte  = (int) $mes_fin;
+                        $inicioMesReporte = date('Y-m-01', mktime(0, 0, 0, $mesReporte, 1, $anioReporte));
+                        $finMesReporte    = date('Y-m-t', mktime(0, 0, 0, $mesReporte, 1, $anioReporte));
 
 
 				// ULTIMA FILA TOTALES	
@@ -690,7 +692,7 @@ function generar($aForm = '')
 				$sumaDeprAcumulada	  = 0;
 				$sumaValorPorDepr	  = 0;
 				// LISTA DEPRECIACION DE ACTIVOS
-                        $sql = " SELECT saeact.act_cod_act,
+                                $sql = " SELECT saeact.act_cod_act,
                                          saeact.act_clave_act,
                                          saeact.act_nom_act,
                                          saeact.act_val_comp,
@@ -719,6 +721,7 @@ function generar($aForm = '')
                                                        SUM(cdep_gas_depn) AS gasto_depr
                                                 FROM saecdep
                                                 WHERE cdep_ani_depr = $anioReporte
+                                                  AND cdep_mes_depr = $mesReporte
                                                 GROUP BY 1,2,3
                                         ) curr ON curr.cdep_cod_acti = saeact.act_cod_act
                                                 AND curr.act_cod_empr = saeact.act_cod_empr
@@ -730,13 +733,16 @@ function generar($aForm = '')
                                                        SUM(cdep_gas_depn) AS dep_anterior
                                                 FROM saecdep
                                                 WHERE cdep_ani_depr < $anioReporte
+                                                   OR (cdep_ani_depr = $anioReporte AND cdep_mes_depr < $mesReporte)
                                                 GROUP BY 1,2,3
                                         ) prev ON prev.cdep_cod_acti = saeact.act_cod_act
                                                 AND prev.act_cod_empr = saeact.act_cod_empr
                                                 AND prev.act_cod_sucu = saeact.act_cod_sucu
                            WHERE ( saeact.act_cod_empr = $empresa ) and
                                         ( COALESCE(DATE_PART('year', act_fiman_act ),3000)   >= $anioReporte  )  and
-                                         ( DATE_PART('year', act_fcmp_act) <= $anioReporte)
+                                         ( DATE_PART('year', act_fcmp_act) <= $anioReporte) and
+                                         ( saeact.act_fcmp_act <= '$finMesReporte') and
+                                         ( COALESCE(saeact.act_fiman_act, '2999-12-31') >= '$inicioMesReporte')
                                                 $filtro
                                                 ORDER BY saegact.gact_des_gact, saesgac.sgac_des_sgac, saeact.act_nom_act, act_cod_act ";
 				//echo $sql; exit;
@@ -761,9 +767,10 @@ function generar($aForm = '')
                                                         $deprAnterior  = $oIfx->f('dep_anterior');
                                                         $gastoDepr     = $oIfx->f('gasto_depr');
 
-							$valorNeto     = $valorCompra - $valorResidu;
-							$deprAcumulada = $deprAnterior + $gastoDepr;
-							$valorPorDepr  = $valorCompra -  $deprAcumulada;
+                                                        $valorNeto     = $valorCompra - $valorResidu;
+                                                        $deprAcumulada = $deprAnterior + $gastoDepr;
+                                                        $deprAcumuladaMostrar = min($deprAcumulada, $valorNeto);
+                                                        $valorPorDepr  = max($valorNeto -  $deprAcumuladaMostrar, 0);
 
 							if ($i < 2) {
 								$html .= '<tr>
@@ -784,7 +791,7 @@ function generar($aForm = '')
 										<td align = right>' . number_format($valorNeto, 2, '.', ',') . ' </td>
 										<td align = right>' . number_format($deprAnterior, 2, '.', ',') . ' </td>
 										<td align = right>' . number_format($gastoDepr, 2, '.', ',') . ' </td>
-										<td align = right>' . number_format($deprAcumulada, 2, '.', ',') . ' </td>
+                                                                                                <td align = right>' . number_format($deprAcumuladaMostrar, 2, '.', ',') . ' </td>
 										<td align = right>' . number_format($valorPorDepr, 2, '.', ',') . ' </td>
 									</tr>';
 								$totalValorCompra     =  $valorCompra;
@@ -792,7 +799,7 @@ function generar($aForm = '')
 								$totalValorNeto       =  $valorNeto;
 								$totalDeprAnterior    =  $deprAnterior;
 								$totalGastoDepr       =  $gastoDepr;
-								$totalDeprAcumulada   =  $deprAcumulada;
+                                                                        $totalDeprAcumulada   =  $deprAcumuladaMostrar;
 								$totalValorPorDepr    =  $valorPorDepr;
 							} else {
 								if ($grupo == $grupoAnt) {
@@ -801,7 +808,7 @@ function generar($aForm = '')
 									$totalValorNeto     = $totalValorNeto     + $valorNeto;
 									$totalDeprAnterior  = $totalDeprAnterior  + $deprAnterior;
 									$totalGastoDepr     = $totalGastoDepr     + $gastoDepr;
-									$totalDeprAcumulada = $totalDeprAcumulada + $deprAcumulada;
+                                                                        $totalDeprAcumulada = $totalDeprAcumulada + $deprAcumuladaMostrar;
 									$totalValorPorDepr  = $totalValorPorDepr  + $valorPorDepr;
 									if ($subgrupo == $subgrupoAnt) {
 										$html .= '<tr>
@@ -816,7 +823,7 @@ function generar($aForm = '')
 												<td align = right>' . number_format($valorNeto, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($deprAnterior, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($gastoDepr, 2, '.', ',') . ' </td>
-												<td align = right>' . number_format($deprAcumulada, 2, '.', ',') . ' </td>
+                                                                                                <td align = right>' . number_format($deprAcumuladaMostrar, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($valorPorDepr, 2, '.', ',') . ' </td>
 											</tr>';
 									} else {
@@ -835,7 +842,7 @@ function generar($aForm = '')
 												<td align = right>' . number_format($valorNeto, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($deprAnterior, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($gastoDepr, 2, '.', ',') . ' </td>
-												<td align = right>' . number_format($deprAcumulada, 2, '.', ',') . ' </td>
+                                                                                                <td align = right>' . number_format($deprAcumuladaMostrar, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($valorPorDepr, 2, '.', ',') . ' </td>
 											</tr>';
 									}
@@ -867,7 +874,7 @@ function generar($aForm = '')
 											<td align = right>' . number_format($valorNeto, 2, '.', ',') . ' </td>
 											<td align = right>' . number_format($deprAnterior, 2, '.', ',') . ' </td>
 											<td align = right>' . number_format($gastoDepr, 2, '.', ',') . ' </td>
-											<td align = right>' . number_format($deprAcumulada, 2, '.', ',') . ' </td>
+                                                                                        <td align = right>' . number_format($deprAcumuladaMostrar, 2, '.', ',') . ' </td>
 											<td align = right>' . number_format($valorPorDepr, 2, '.', ',') . ' </td>
 										</tr>';
 									// GUARDAR TOTALES GENERALES
@@ -884,7 +891,7 @@ function generar($aForm = '')
 									$totalValorNeto       =  $valorNeto;
 									$totalDeprAnterior    =  $deprAnterior;
 									$totalGastoDepr       =  $gastoDepr;
-									$totalDeprAcumulada   =  $deprAcumulada;
+                                                                        $totalDeprAcumulada   =  $deprAcumuladaMostrar;
 									$totalValorPorDepr    =  $valorPorDepr;
 								}
 								// TOTAL POR GRUPOS
@@ -931,6 +938,8 @@ function generar($aForm = '')
                 else {
                         $anioReporte = (int) $anio_fin;
                         $mesReporte  = (int) $mes_fin;
+                        $inicioMesReporte = date('Y-m-01', mktime(0, 0, 0, $mesReporte, 1, $anioReporte));
+                        $finMesReporte    = date('Y-m-t', mktime(0, 0, 0, $mesReporte, 1, $anioReporte));
                         // LISTA DEPRECIACION DE ACTIVOS
                         $sql = " SELECT saeact.act_cod_act,
                                          saeact.act_clave_act,
@@ -962,6 +971,7 @@ function generar($aForm = '')
                                                        SUM(cdep_gas_depn) AS gasto_depr
                                                 FROM saecdep
                                                 WHERE cdep_ani_depr = $anioReporte
+                                                  AND cdep_mes_depr = $mesReporte
                                                 GROUP BY 1,2,3
                                         ) curr ON curr.cdep_cod_acti = saeact.act_cod_act
                                                 AND curr.act_cod_empr = saeact.act_cod_empr
@@ -973,13 +983,16 @@ function generar($aForm = '')
                                                        SUM(cdep_gas_depn) AS dep_anterior
                                                 FROM saecdep
                                                 WHERE cdep_ani_depr < $anioReporte
+                                                   OR (cdep_ani_depr = $anioReporte AND cdep_mes_depr < $mesReporte)
                                                 GROUP BY 1,2,3
                                         ) prev ON prev.cdep_cod_acti = saeact.act_cod_act
                                                 AND prev.act_cod_empr = saeact.act_cod_empr
                                                 AND prev.act_cod_sucu = saeact.act_cod_sucu
                                         WHERE ( saeact.act_cod_empr = $empresa ) and
                                          ( COALESCE(DATE_PART('year', act_fiman_act ),3000)   >= $anioReporte  )  and
-                                         ( DATE_PART('year', act_fcmp_act) <= $anioReporte)
+                                         ( DATE_PART('year', act_fcmp_act) <= $anioReporte) and
+                                         ( saeact.act_fcmp_act <= '$finMesReporte') and
+                                         ( COALESCE(saeact.act_fiman_act, '2999-12-31') >= '$inicioMesReporte')
                                                 $filtro
                                                 ORDER BY saegact.gact_des_gact, saesgac.sgac_des_sgac, saeact.act_nom_act, act_cod_act ";
 			//echo $sql; exit;
@@ -1008,7 +1021,8 @@ function generar($aForm = '')
                                                 $deprAcumulada = $deprAnterior + $gastoDepr;
 
                                                 $valorNeto     = $valorCompra - $valorResidu;
-                                                $valorPorDepr  = $valorCompra -  $deprAcumulada;
+                                                $deprAcumuladaMostrar = min($deprAcumulada, $valorNeto);
+                                                $valorPorDepr  = max($valorNeto -  $deprAcumuladaMostrar, 0);
 
 						if ($i < 2) {
 							$html .= '<tr>
@@ -1029,7 +1043,7 @@ function generar($aForm = '')
 										<td align = right>' . number_format($valorNeto, 2, '.', ',') . ' </td>
 										<td align = right>' . number_format($deprAnterior, 2, '.', ',') . ' </td>
 										<td align = right>' . number_format($gastoDepr, 2, '.', ',') . ' </td>
-										<td align = right>' . number_format($deprAcumulada, 2, '.', ',') . ' </td>
+                                                                                <td align = right>' . number_format($deprAcumuladaMostrar, 2, '.', ',') . ' </td>
 										<td align = right>' . number_format($valorPorDepr, 2, '.', ',') . ' </td>
 									</tr>';
 							$totalValorCompra     =  $valorCompra;
@@ -1037,7 +1051,7 @@ function generar($aForm = '')
 							$totalValorNeto       =  $valorNeto;
 							$totalDeprAnterior    =  $deprAnterior;
 							$totalGastoDepr       =  $gastoDepr;
-							$totalDeprAcumulada   =  $deprAcumulada;
+                                                   $totalDeprAcumulada   =  $deprAcumuladaMostrar;
 							$totalValorPorDepr    =  $valorPorDepr;
 						} else {
 							if ($grupo == $grupoAnt) {
@@ -1046,7 +1060,7 @@ function generar($aForm = '')
 								$totalValorNeto     = $totalValorNeto     + $valorNeto;
 								$totalDeprAnterior  = $totalDeprAnterior  + $deprAnterior;
 								$totalGastoDepr     = $totalGastoDepr     + $gastoDepr;
-								$totalDeprAcumulada = $totalDeprAcumulada + $deprAcumulada;
+                                                           $totalDeprAcumulada = $totalDeprAcumulada + $deprAcumuladaMostrar;
 								$totalValorPorDepr  = $totalValorPorDepr  + $valorPorDepr;
 								if ($subgrupo == $subgrupoAnt) {
 									$html .= '<tr>
@@ -1061,7 +1075,7 @@ function generar($aForm = '')
 												<td align = right>' . number_format($valorNeto, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($deprAnterior, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($gastoDepr, 2, '.', ',') . ' </td>
-												<td align = right>' . number_format($deprAcumulada, 2, '.', ',') . ' </td>
+                                                                                           <td align = right>' . number_format($deprAcumuladaMostrar, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($valorPorDepr, 2, '.', ',') . ' </td>
 											</tr>';
 								} else {
@@ -1080,7 +1094,7 @@ function generar($aForm = '')
 												<td align = right>' . number_format($valorNeto, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($deprAnterior, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($gastoDepr, 2, '.', ',') . ' </td>
-												<td align = right>' . number_format($deprAcumulada, 2, '.', ',') . ' </td>
+                                                                                           <td align = right>' . number_format($deprAcumuladaMostrar, 2, '.', ',') . ' </td>
 												<td align = right>' . number_format($valorPorDepr, 2, '.', ',') . ' </td>
 											</tr>';
 								}
@@ -1112,7 +1126,7 @@ function generar($aForm = '')
 											<td align = right>' . number_format($valorNeto, 2, '.', ',') . ' </td>
 											<td align = right>' . number_format($deprAnterior, 2, '.', ',') . ' </td>
 											<td align = right>' . number_format($gastoDepr, 2, '.', ',') . ' </td>
-											<td align = right>' . number_format($deprAcumulada, 2, '.', ',') . ' </td>
+                                                                                   <td align = right>' . number_format($deprAcumuladaMostrar, 2, '.', ',') . ' </td>
 											<td align = right>' . number_format($valorPorDepr, 2, '.', ',') . ' </td>
 										</tr>';
 								// GUARDAR TOTALES GENERALES
@@ -1129,7 +1143,7 @@ function generar($aForm = '')
 								$totalValorNeto       =  $valorNeto;
 								$totalDeprAnterior    =  $deprAnterior;
 								$totalGastoDepr       =  $gastoDepr;
-								$totalDeprAcumulada   =  $deprAcumulada;
+                                                           $totalDeprAcumulada   =  $deprAcumuladaMostrar;
 								$totalValorPorDepr    =  $valorPorDepr;
 							}
 							// TOTAL POR GRUPOS
