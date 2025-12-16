@@ -729,9 +729,9 @@ function generar($aForm = '')
 					 ( saeact.act_cod_act = saecdep.cdep_cod_acti ) and  
 					 ( saeact.act_cod_empr = saecdep.act_cod_empr ) and  
 					 ( ( saecdep.act_cod_empr = $empresa ) and
-					 ( saecdep.cdep_ani_depr between $anio and $anio_fin ) and  
-					 ( saecdep.cdep_mes_depr =$m  ) ) and
-					 ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($anio_fin *100 + $m)  )  and
+                                        ( saecdep.cdep_ani_depr = $anio ) and
+                                        ( saecdep.cdep_mes_depr = $m ) ) and
+                                        ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($anio_fin *100 + $m)  )  and
 					 ( DATE_PART('year', act_fcmp_act) < $anio_fin or ( DATE_PART('year', act_fcmp_act) = $anio_fin and DATE_PART('month',act_fcmp_act)<= $m))
 						$filtro
 						GROUP BY 1,2,3,4,5,6,7,8,10,11,12,13,14,17,18,19
