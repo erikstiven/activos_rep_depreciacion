@@ -624,8 +624,8 @@ function generar($aForm = '')
 	// $fecha_corte  = $aForm['fecha_corte'];
 	// $fecha_corte  = fecha_informix_func($fecha_corte);
 	// $fechaServer  = date("Y-m-d");
-	$fechaini = date("Y-m-d", mktime(0, 0, 0, $mes, 1, $anio));
-	$fechafin = date("Y-m-t", mktime(0, 0, 0, $mes_fin, 1, $anio_fin));
+        $fechaini = date("Y-m-d", mktime(0, 0, 0, $mes, 1, $anio));
+        $fechafin = date("Y-m-t", mktime(0, 0, 0, $mes_fin, 1, $anio_fin));
 	// ARMAR FILTROS
 	$filtro = '';
 	if (empty($grupo)) {
@@ -677,7 +677,12 @@ function generar($aForm = '')
 
 		if ($detallado == 'S') {
 
-			for ($m = $mes; $m <= $mes_fin; $m++) {
+                        $periodo = new DateTime(date('Y-m-01', mktime(0, 0, 0, $mes, 1, $anio)));
+                        $finPeriodo = new DateTime(date('Y-m-01', mktime(0, 0, 0, $mes_fin, 1, $anio_fin)));
+                        while ($periodo <= $finPeriodo) {
+                                $anioReporte = (int) $periodo->format('Y');
+                                $mesReporte  = (int) $periodo->format('n');
+                                $periodoClave = ($anioReporte * 100) + $mesReporte;
 
 
 				// ULTIMA FILA TOTALES	
@@ -698,10 +703,10 @@ function generar($aForm = '')
                                          saeact.act_fiman_act,
                                          saeact.act_fdep_act,
                                          max(saecdep.cdep_ani_depr) as cdep_ani_depr,
-                                         saegact.gact_cod_gact,
-                                         saegact.gact_des_gact,
-                                         saesgac.sgac_cod_sgac,
-                                         saesgac.sgac_des_sgac,
+                                        saegact.gact_cod_gact,
+                                        saegact.gact_des_gact,
+                                        saesgac.sgac_cod_sgac,
+                                        saesgac.sgac_des_sgac,
                                         (
                                                 select COALESCE(sum(c.cdep_gas_depn), 0)
                                                 from saecdep c
@@ -709,8 +714,7 @@ function generar($aForm = '')
                                                 and c.act_cod_empr = saecdep.act_cod_empr
                                                 and c.act_cod_sucu = saecdep.act_cod_sucu
                                                 and (
-                                                        c.cdep_ani_depr < $anio
-                                                        or (c.cdep_ani_depr = $anio and c.cdep_mes_depr < $m)
+                                                        (c.cdep_ani_depr * 100 + c.cdep_mes_depr) < $periodoClave
                                                 )
                                         ) as cdep_dep_acum,
                                          sum(saecdep.cdep_gas_depn) as cdep_gas_depn,
@@ -729,10 +733,10 @@ function generar($aForm = '')
                                          ( saeact.act_cod_act = saecdep.cdep_cod_acti ) and
                                          ( saeact.act_cod_empr = saecdep.act_cod_empr ) and
                                          ( ( saecdep.act_cod_empr = $empresa ) and
-                                        ( saecdep.cdep_ani_depr = $anio ) and
-                                        ( saecdep.cdep_mes_depr = $m ) ) and
-                                        ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($anio_fin *100 + $m)  )  and
-                                         ( DATE_PART('year', act_fcmp_act) < $anio_fin or ( DATE_PART('year', act_fcmp_act) = $anio_fin and DATE_PART('month',act_fcmp_act)<= $m))
+                                        ( saecdep.cdep_ani_depr = $anioReporte ) and
+                                        ( saecdep.cdep_mes_depr = $mesReporte ) ) and
+                                        ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($periodoClave)  )  and
+                                         ( DATE_PART('year', act_fcmp_act) < $anioReporte or ( DATE_PART('year', act_fcmp_act) = $anioReporte and DATE_PART('month',act_fcmp_act)<= $mesReporte))
                                                 $filtro
                                                 GROUP BY 1,2,3,4,5,6,7,8,10,11,12,13,14,17,18,19
                                                 ORDER BY saegact.gact_des_gact, saesgac.sgac_des_sgac, saeact.act_nom_act, cdep_ani_depr, cdep_mes_depr ";
@@ -748,8 +752,8 @@ function generar($aForm = '')
 							$nombre 	   = $oIfx->f('act_nom_act');
 							$fechaDepre    = $oIfx->f('act_fdep_act');
 							$vidaUtil      = $oIfx->f('act_vutil_act');
-							$anio 		   = $oIfx->f('cdep_ani_depr');
-							$mes 		   = $oIfx->f('cdep_mes_depr');
+                                                        $anio              = $anioReporte;
+                                                        $mes               = $mesReporte;
 							$valorCompra   = $oIfx->f('act_val_comp');
 							$valorResidu   = $oIfx->f('act_vres_act');
 							$serie         = $oIfx->f('act_seri_act');
@@ -921,13 +925,17 @@ function generar($aForm = '')
 							</tr>';
 					}
 				}
-				$oIfx->Free();
-			} //CIERRE FOR MES
+                                $oIfx->Free();
+                                $periodo->modify('+1 month');
+                        } //CIERRE BUCLE POR MES
 
 		} //CIERRE IF DETALLADO
 
-		else {
-			// LISTA DEPRECIACION DE ACTIVOS
+                else {
+                        $anioReporte = (int) $anio_fin;
+                        $mesReporte  = (int) $mes_fin;
+                        $periodoClave = ($anioReporte * 100) + $mesReporte;
+                        // LISTA DEPRECIACION DE ACTIVOS
                         $sql = " SELECT saeact.act_cod_act,
                                          saeact.act_clave_act,
                                          saeact.act_nom_act,
@@ -937,10 +945,10 @@ function generar($aForm = '')
                                          saeact.act_fiman_act,
                                          saeact.act_fdep_act,
                                          max(saecdep.cdep_ani_depr) as cdep_ani_depr,
-                                         saegact.gact_cod_gact,
-                                         saegact.gact_des_gact,
-                                         saesgac.sgac_cod_sgac,
-                                         saesgac.sgac_des_sgac,
+                                        saegact.gact_cod_gact,
+                                        saegact.gact_des_gact,
+                                        saesgac.sgac_cod_sgac,
+                                        saesgac.sgac_des_sgac,
                                         (
                                                 select COALESCE(sum(c.cdep_gas_depn), 0)
                                                 from saecdep c
@@ -948,8 +956,7 @@ function generar($aForm = '')
                                                 and c.act_cod_empr = saecdep.act_cod_empr
                                                 and c.act_cod_sucu = saecdep.act_cod_sucu
                                                 and (
-                                                        c.cdep_ani_depr < $anio_fin
-                                                        or (c.cdep_ani_depr = $anio_fin and c.cdep_mes_depr < $mes_fin)
+                                                        (c.cdep_ani_depr * 100 + c.cdep_mes_depr) < $periodoClave
                                                 )
                                         ) as cdep_dep_acum,
                                          sum(saecdep.cdep_gas_depn) as cdep_gas_depn,
@@ -969,10 +976,10 @@ function generar($aForm = '')
                                          ( saeact.act_cod_act = saecdep.cdep_cod_acti ) and
                                          ( saeact.act_cod_empr = saecdep.act_cod_empr ) and
                                          ( ( saecdep.act_cod_empr = $empresa ) and
-                                         ( saecdep.cdep_ani_depr = $anio_fin ) and
-                                         ( saecdep.cdep_mes_depr = $mes_fin ) ) and
-                                         ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($anio_fin *100 + $mes_fin)  )  and
-                                         ( DATE_PART('year', act_fcmp_act) < $anio_fin or ( DATE_PART('year', act_fcmp_act) = $anio_fin and DATE_PART('month',act_fcmp_act)<= $mes_fin))
+                                         ( saecdep.cdep_ani_depr = $anioReporte ) and
+                                         ( saecdep.cdep_mes_depr = $mesReporte ) ) and
+                                         ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($periodoClave)  )  and
+                                         ( DATE_PART('year', act_fcmp_act) < $anioReporte or ( DATE_PART('year', act_fcmp_act) = $anioReporte and DATE_PART('month',act_fcmp_act)<= $mesReporte))
                                                 $filtro
                                                 GROUP BY 1,2,3,4,5,6,7,8,10,11,12,13,14,17,18,19
                                                 ORDER BY saegact.gact_des_gact, saesgac.sgac_des_sgac, saeact.act_nom_act, cdep_ani_depr, cdep_mes_depr ";
@@ -990,8 +997,8 @@ function generar($aForm = '')
 						$nombre 	   = $oIfx->f('act_nom_act');
 						$fechaDepre    = $oIfx->f('act_fdep_act');
 						$vidaUtil      = $oIfx->f('act_vutil_act');
-						$anio 		   = $oIfx->f('cdep_ani_depr');
-						$mes 		   = $oIfx->f('cdep_mes_depr');
+                                                        $anio              = $anioReporte;
+                                                        $mes               = $mesReporte;
 						$valorCompra   = $oIfx->f('act_val_comp');
 						$valorResidu   = $oIfx->f('act_vres_act');
 						$serie         = $oIfx->f('act_seri_act');
