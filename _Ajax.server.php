@@ -675,9 +675,11 @@ function generar($aForm = '')
 							</tr> ';
 		// CAVECERA TABLA
 
-		if ($detallado == 'S') {
+                if ($detallado == 'S') {
 
-			for ($m = $mes; $m <= $mes_fin; $m++) {
+                        $anio_reporte = $anio;
+
+                        for ($m = $mes; $m <= $mes_fin; $m++) {
 
 
 				// ULTIMA FILA TOTALES	
@@ -689,49 +691,53 @@ function generar($aForm = '')
 				$sumaDeprAcumulada	  = 0;
 				$sumaValorPorDepr	  = 0;
 				// LISTA DEPRECIACION DE ACTIVOS
-				$sql = " SELECT saeact.act_cod_act,   
-					 saeact.act_clave_act,   
-					 saeact.act_nom_act,   
-					 saeact.act_val_comp,   
-					 saeact.act_vutil_act,   
-					 saeact.act_fcmp_act, 
-					 saeact.act_fiman_act,  
-					 saeact.act_fdep_act,   
-					 max(saecdep.cdep_ani_depr) as cdep_ani_depr,   
-					 saegact.gact_cod_gact,   
-					 saegact.gact_des_gact,   
-					 saesgac.sgac_cod_sgac,   
-					 saesgac.sgac_des_sgac,   					 
-					(select c.cdep_dep_acum 
-					 from saecdep c 
-					 where c.cdep_cod_acti = saecdep.cdep_cod_acti
-					 and c.act_cod_empr = saecdep.act_cod_empr
-					 and c.act_cod_sucu = saecdep.act_cod_sucu
-					 and c.cdep_ani_depr = $anio
-					 and c.cdep_mes_depr = $m) as cdep_dep_acum,
-					 sum(saecdep.cdep_gas_depn) as cdep_gas_depn, 					 
-					 max(saecdep.cdep_mes_depr) as cdep_mes_depr,
-					 DATE_PART('year', act_fiman_act ) anio,
-					 DATE_PART('month',act_fiman_act) mes ,
-					 saeact.act_vres_act
-					FROM saegact,   
-						 saesgac,
-						 saecdep,   
-						 saeact  
-			   WHERE ( saegact.gact_cod_gact = saesgac.gact_cod_gact ) and  
-					 ( saegact.gact_cod_empr = saesgac.sgac_cod_empr ) and  
-					 ( saesgac.sgac_cod_sgac = saeact.sgac_cod_sgac ) and  
-					 ( saesgac.sgac_cod_empr = saeact.act_cod_empr ) and  			
-					 ( saeact.act_cod_act = saecdep.cdep_cod_acti ) and  
-					 ( saeact.act_cod_empr = saecdep.act_cod_empr ) and  
-					 ( ( saecdep.act_cod_empr = $empresa ) and
-					 ( saecdep.cdep_ani_depr between $anio and $anio_fin ) and  
-					 ( saecdep.cdep_mes_depr =$m  ) ) and
-					 ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($anio_fin *100 + $m)  )  and
-					 ( DATE_PART('year', act_fcmp_act) < $anio_fin or ( DATE_PART('year', act_fcmp_act) = $anio_fin and DATE_PART('month',act_fcmp_act)<= $m))
-						$filtro
-						GROUP BY 1,2,3,4,5,6,7,8,10,11,12,13,14,17,18,19
-						ORDER BY saegact.gact_des_gact, saesgac.sgac_des_sgac, saeact.act_nom_act, cdep_ani_depr, cdep_mes_depr ";
+                                $sql = " SELECT
+                                                saeact.act_cod_act,
+                                                saeact.act_clave_act,
+                                                saeact.act_nom_act,
+                                                saeact.act_val_comp,
+                                                saeact.act_vutil_act,
+                                                saeact.act_fcmp_act,
+                                                saeact.act_fiman_act,
+                                                saeact.act_fdep_act,
+                                                COALESCE(historico.dep_anterior, 0) AS dep_anterior,
+                                                saegact.gact_cod_gact,
+                                                saegact.gact_des_gact,
+                                                saesgac.sgac_cod_sgac,
+                                                saesgac.sgac_des_sgac,
+                                                COALESCE(actual.cdep_gas_depn, 0)     AS gasto_mes,
+                                                COALESCE(actual.cdep_ani_depr, $anio_reporte) AS cdep_ani_depr,
+                                                COALESCE(actual.cdep_mes_depr, $m)   AS cdep_mes_depr,
+                                                DATE_PART('year', act_fiman_act ) anio,
+                                                DATE_PART('month',act_fiman_act) mes ,
+                                                saeact.act_vres_act
+                                        FROM saegact
+                                        INNER JOIN saesgac ON ( saegact.gact_cod_gact = saesgac.gact_cod_gact ) and
+                                                                ( saegact.gact_cod_empr = saesgac.sgac_cod_empr )
+                                        INNER JOIN saeact ON ( saesgac.sgac_cod_sgac = saeact.sgac_cod_sgac ) and
+                                                              ( saesgac.sgac_cod_empr = saeact.act_cod_empr )
+                                        INNER JOIN saecdep actual ON ( saeact.act_cod_act = actual.cdep_cod_acti ) and
+                                                                     ( saeact.act_cod_empr = actual.act_cod_empr ) and
+                                                                     ( saeact.act_cod_sucu = actual.act_cod_sucu ) and
+                                                                     ( actual.act_cod_empr = $empresa ) and
+                                                                     ( actual.cdep_ani_depr = $anio_reporte ) and
+                                                                     ( actual.cdep_mes_depr = $m )
+                                        LEFT JOIN (
+                                                SELECT cdep_cod_acti,
+                                                       act_cod_empr,
+                                                       act_cod_sucu,
+                                                       SUM(cdep_gas_depn) AS dep_anterior
+                                                FROM saecdep
+                                                WHERE act_cod_empr = $empresa
+                                                AND (cdep_ani_depr < $anio_reporte OR (cdep_ani_depr = $anio_reporte AND cdep_mes_depr < $m))
+                                                GROUP BY 1,2,3
+                                        ) historico ON historico.cdep_cod_acti = saeact.act_cod_act
+                                                  AND historico.act_cod_empr = saeact.act_cod_empr
+                                                  AND historico.act_cod_sucu = saeact.act_cod_sucu
+                                        WHERE ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($anio_reporte *100 + $m)  )  and
+                                              ( DATE_PART('year', act_fcmp_act) < $anio_reporte or ( DATE_PART('year', act_fcmp_act) = $anio_reporte and DATE_PART('month',act_fcmp_act)<= $m))
+                                                $filtro
+                                        ORDER BY saegact.gact_des_gact, saesgac.sgac_des_sgac, saeact.act_nom_act, cdep_ani_depr, cdep_mes_depr ";
 				//echo $sql; exit;
 				//$oReturn->alert($sql);
 				if ($oIfx->Query($sql)) {
@@ -751,12 +757,12 @@ function generar($aForm = '')
 							$serie         = $oIfx->f('act_seri_act');
 							$grupo  	   = $oIfx->f('gact_des_gact');
 							$subgrupo 	   = $oIfx->f('sgac_des_sgac');
-							$deprAnterior  = $oIfx->f('cdep_dep_acum');
-							$gastoDepr     = $oIfx->f('cdep_gas_depn');
+                                                        $deprAnterior  = $oIfx->f('dep_anterior');
+                                                        $gastoDepr     = $oIfx->f('gasto_mes');
 
-							$valorNeto     = $valorCompra - $valorResidu;
-							$deprAcumulada = $deprAnterior + $gastoDepr;
-							$valorPorDepr  = $valorCompra -  $deprAcumulada;
+                                                        $valorNeto     = $valorCompra - $valorResidu;
+                                                        $deprAcumulada = $deprAnterior + $gastoDepr;
+                                                        $valorPorDepr  = $valorNeto -  $deprAcumulada;
 
 							if ($i < 2) {
 								$html .= '<tr>
@@ -923,51 +929,54 @@ function generar($aForm = '')
 		} //CIERRE IF DETALLADO
 
 		else {
-			// LISTA DEPRECIACION DE ACTIVOS
-			$sql = " SELECT saeact.act_cod_act,   
-					 saeact.act_clave_act,   
-					 saeact.act_nom_act,   
-					 saeact.act_val_comp,   
-					 saeact.act_vutil_act,   
-					 saeact.act_fcmp_act, 
-					 saeact.act_fiman_act,  
-					 saeact.act_fdep_act,   
-					 max(saecdep.cdep_ani_depr) as cdep_ani_depr,   
-					 saegact.gact_cod_gact,   
-					 saegact.gact_des_gact,   
-					 saesgac.sgac_cod_sgac,   
-					 saesgac.sgac_des_sgac,   					 
-					(select c.cdep_dep_acum 
-					 from saecdep c 
-					 where c.cdep_cod_acti = saecdep.cdep_cod_acti
-					 and c.act_cod_empr = saecdep.act_cod_empr
-					 and c.act_cod_sucu = saecdep.act_cod_sucu
-					 and c.cdep_ani_depr = $anio_fin
-					 and c.cdep_mes_depr = $mes_fin) as cdep_dep_acum,
-					 max(saecdep.cdep_gas_depn) as cdep_gas_depn, 					 
-					 max(saecdep.cdep_mes_depr) as cdep_mes_depr,
-					 DATE_PART('year', act_fiman_act ) anio,
-					 DATE_PART('month',act_fiman_act) mes,
-					 saeact.act_vres_act,
-					 MAX(saecdep.cdep_val_rep1) as cdep_val_rep1
-
-					FROM saegact,   
-						 saesgac,
-						 saecdep,   
-						 saeact  
-					WHERE ( saegact.gact_cod_gact = saesgac.gact_cod_gact ) and  
-					 ( saegact.gact_cod_empr = saesgac.sgac_cod_empr ) and  
-					 ( saesgac.sgac_cod_sgac = saeact.sgac_cod_sgac ) and  
-					 ( saesgac.sgac_cod_empr = saeact.act_cod_empr ) and  			
-					 ( saeact.act_cod_act = saecdep.cdep_cod_acti ) and  
-					 ( saeact.act_cod_empr = saecdep.act_cod_empr ) and  
-					 ( ( saecdep.act_cod_empr = $empresa ) and
-					 ( saecdep.cdep_fec_depr between '$fechaini' and '$fechafin')) and
-					 ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($anio_fin *100 + $mes_fin)  )  and
-					 ( DATE_PART('year', act_fcmp_act) < $anio_fin or ( DATE_PART('year', act_fcmp_act) = $anio_fin and DATE_PART('month',act_fcmp_act)<= $mes_fin))
-						$filtro
-						GROUP BY 1,2,3,4,5,6,7,8,10,11,12,13,14,17,18,19
-						ORDER BY saegact.gact_des_gact, saesgac.sgac_des_sgac, saeact.act_nom_act, cdep_ani_depr, cdep_mes_depr ";
+                        // LISTA DEPRECIACION DE ACTIVOS
+                        $sql = " SELECT
+                                        saeact.act_cod_act,
+                                        saeact.act_clave_act,
+                                        saeact.act_nom_act,
+                                        saeact.act_val_comp,
+                                        saeact.act_vutil_act,
+                                        saeact.act_fcmp_act,
+                                        saeact.act_fiman_act,
+                                        saeact.act_fdep_act,
+                                        COALESCE(historico.dep_anterior, 0) AS dep_anterior,
+                                        saegact.gact_cod_gact,
+                                        saegact.gact_des_gact,
+                                        saesgac.sgac_cod_sgac,
+                                        saesgac.sgac_des_sgac,
+                                        COALESCE(actual.cdep_gas_depn, 0) AS gasto_mes,
+                                        COALESCE(actual.cdep_ani_depr, $anio_fin) AS cdep_ani_depr,
+                                        COALESCE(actual.cdep_mes_depr, $mes_fin) AS cdep_mes_depr,
+                                        DATE_PART('year', act_fiman_act ) anio,
+                                        DATE_PART('month',act_fiman_act) mes,
+                                        saeact.act_vres_act
+                                FROM saegact
+                                INNER JOIN saesgac ON ( saegact.gact_cod_gact = saesgac.gact_cod_gact ) and
+                                                        ( saegact.gact_cod_empr = saesgac.sgac_cod_empr )
+                                INNER JOIN saeact ON ( saesgac.sgac_cod_sgac = saeact.sgac_cod_sgac ) and
+                                                      ( saesgac.sgac_cod_empr = saeact.act_cod_empr )
+                                INNER JOIN saecdep actual ON ( saeact.act_cod_act = actual.cdep_cod_acti ) and
+                                                             ( saeact.act_cod_empr = actual.act_cod_empr ) and
+                                                             ( saeact.act_cod_sucu = actual.act_cod_sucu ) and
+                                                             ( actual.act_cod_empr = $empresa ) and
+                                                             ( actual.cdep_ani_depr = $anio_fin ) and
+                                                             ( actual.cdep_mes_depr = $mes_fin )
+                                LEFT JOIN (
+                                        SELECT cdep_cod_acti,
+                                               act_cod_empr,
+                                               act_cod_sucu,
+                                               SUM(cdep_gas_depn) AS dep_anterior
+                                        FROM saecdep
+                                        WHERE act_cod_empr = $empresa
+                                        AND (cdep_ani_depr < $anio_fin OR (cdep_ani_depr = $anio_fin AND cdep_mes_depr < $mes_fin))
+                                        GROUP BY 1,2,3
+                                ) historico ON historico.cdep_cod_acti = saeact.act_cod_act
+                                          AND historico.act_cod_empr = saeact.act_cod_empr
+                                          AND historico.act_cod_sucu = saeact.act_cod_sucu
+                                WHERE ( ( (COALESCE(DATE_PART('year', act_fiman_act ),3000))*100+COALESCE(DATE_PART('month',act_fiman_act),13)   )  > ($anio_fin *100 + $mes_fin)  )  and
+                                      ( DATE_PART('year', act_fcmp_act) < $anio_fin or ( DATE_PART('year', act_fcmp_act) = $anio_fin and DATE_PART('month',act_fcmp_act)<= $mes_fin))
+                                        $filtro
+                                ORDER BY saegact.gact_des_gact, saesgac.sgac_des_sgac, saeact.act_nom_act, cdep_ani_depr, cdep_mes_depr ";
 			//echo $sql; exit;
 			//$oReturn->alert($sql);
 			//( saecdep.cdep_ani_depr between $anio and $anio_fin ) and  
@@ -989,15 +998,11 @@ function generar($aForm = '')
 						$serie         = $oIfx->f('act_seri_act');
 						$grupo  	   = $oIfx->f('gact_des_gact');
 						$subgrupo 	   = $oIfx->f('sgac_des_sgac');
-						//$deprAnterior  = $oIfx->f('cdep_dep_acum');
-						$gastoDepr     = $oIfx->f('cdep_gas_depn');
-						$deprAnterior     = $oIfx->f('cdep_val_rep1')?:0;
-						$deprAcumulada     = $oIfx->f('cdep_dep_acum');
-
-
-
-						$valorNeto     = $valorCompra - $valorResidu;
-						$valorPorDepr  = $valorCompra -  $deprAcumulada;
+                                                $gastoDepr     = $oIfx->f('gasto_mes');
+                                                $deprAnterior  = $oIfx->f('dep_anterior');
+                                                $valorNeto     = $valorCompra - $valorResidu;
+                                                $deprAcumulada = $deprAnterior + $gastoDepr;
+                                                $valorPorDepr  = $valorNeto -  $deprAcumulada;
 
 						if ($i < 2) {
 							$html .= '<tr>
